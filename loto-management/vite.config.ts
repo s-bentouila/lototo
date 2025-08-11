@@ -2,6 +2,9 @@ import path from "path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import devServer from '@hono/vite-dev-server'
+import adapter from '@hono/vite-dev-server/cloudflare'
+import build from '@hono/vite-cloudflare-pages'
 
 // Custom plugin to inject "built by scout" tag
 function injectBuiltByScoutPlugin() {
@@ -19,7 +22,16 @@ function injectBuiltByScoutPlugin() {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), injectBuiltByScoutPlugin()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    injectBuiltByScoutPlugin(),
+    devServer({
+      entry: 'src/backend/api.ts',
+      adapter,
+    }),
+    build()
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

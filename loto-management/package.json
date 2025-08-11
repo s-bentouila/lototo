@@ -7,11 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "vite build && wrangler pages deploy dist"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.832.0",
     "@fontsource/inter": "^5.2.5",
+    "@hono/node-server": "^1.18.1",
     "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -45,7 +47,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
-    "date-fns": "^4.1.0",
+    "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
     "express": "4",
     "hono": "^4.7.10",
@@ -68,6 +70,8 @@
     "zod": "^3.25.20"
   },
   "devDependencies": {
+    "@hono/vite-cloudflare-pages": "^0.1.2",
+    "@hono/vite-dev-server": "^0.1.3",
     "@cloudflare/workers-types": "^4.20250620.0",
     "@eslint/js": "^9.25.0",
     "@types/node": "^22.15.21",
