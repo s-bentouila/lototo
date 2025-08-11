@@ -4,10 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "bun run server.ts",
+    "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "vite build && wrangler pages deploy dist"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.832.0",
@@ -69,6 +70,8 @@
     "zod": "^3.25.20"
   },
   "devDependencies": {
+    "@hono/vite-cloudflare-pages": "^0.1.2",
+    "@hono/vite-dev-server": "^0.1.3",
     "@cloudflare/workers-types": "^4.20250620.0",
     "@eslint/js": "^9.25.0",
     "@types/node": "^22.15.21",
