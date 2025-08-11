@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -108,12 +108,49 @@ interface LockoutProcedure {
 }
 
 export default function App() {
-  const [currentUser] = useState({
-    name: "John Smith",
-    role: "Safety Supervisor",
-    id: "JS001"
+  const [currentUser, setCurrentUser] = useState({ name: "User", role: "Role", id: "U001" });
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [lockoutProcedures, setLockoutProcedures] = useState<any>({});
+  const [analyticsData, setAnalyticsData] = useState<any>({
+    lockoutFrequency: { labels: [], datasets: [] },
+    equipmentBreakdown: { labels: [], datasets: [] },
+    averageDuration: { labels: [], datasets: [] },
+    complianceMetrics: { labels: [], datasets: [] },
+    alertTrends: { labels: [], datasets: [] },
+    responseTime: { labels: [], datasets: [] },
   });
-  
+
+  const fetchData = async () => {
+    try {
+      const [
+        userRes,
+        equipmentRes,
+        notificationsRes,
+        proceduresRes,
+        analyticsRes,
+      ] = await Promise.all([
+        fetch('/api/user'),
+        fetch('/api/equipment'),
+        fetch('/api/notifications'),
+        fetch('/api/procedures'),
+        fetch('/api/analytics'),
+      ]);
+
+      setCurrentUser(await userRes.json());
+      setEquipment(await equipmentRes.json());
+      setNotifications(await notificationsRes.json());
+      setLockoutProcedures(await proceduresRes.json());
+      setAnalyticsData(await analyticsRes.json());
+    } catch (error) {
+      console.error("Failed to fetch initial data", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   const [lockoutDialogOpen, setLockoutDialogOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [procedureStep, setProcedureStep] = useState(0);
@@ -121,90 +158,28 @@ export default function App() {
   const [lockoutReason, setLockoutReason] = useState("");
   const [equipmentFilter, setEquipmentFilter] = useState<string>("all");
   const [analyticsDateRange, setAnalyticsDateRange] = useState<string>("30d");
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: "n001",
-      type: "critical",
-      title: "Overdue Lockout Alert",
-      message: "Industrial Mixer #3 has exceeded planned lockout duration by 3 hours. Immediate attention required.",
-      timestamp: "2024-07-29 14:30:00",
-      equipmentId: "EQ009",
-      isRead: false,
-      requiresAction: true,
-      priority: 1
-    },
-    {
-      id: "n002",
-      type: "critical",
-      title: "Safety Violation",
-      message: "Attempt to operate Emergency Generator #1 while safety systems detected high temperature.",
-      timestamp: "2024-07-29 13:45:00",
-      equipmentId: "EQ005",
-      isRead: false,
-      requiresAction: true,
-      priority: 1
-    },
-    {
-      id: "n003",
-      type: "warning",
-      title: "Missing Signature",
-      message: "Air Compressor #2 lockout procedure completed but missing required supervisor signature.",
-      timestamp: "2024-07-29 12:15:00",
-      equipmentId: "EQ007",
-      isRead: false,
-      requiresAction: true,
-      priority: 2
-    },
-    {
-      id: "n004",
-      type: "warning",
-      title: "Equipment Anomaly",
-      message: "Hydraulic Press #1 showing unusual pressure readings. Consider scheduling inspection.",
-      timestamp: "2024-07-29 11:20:00",
-      equipmentId: "EQ004",
-      isRead: false,
-      requiresAction: false,
-      priority: 3
-    },
-    {
-      id: "n005",
-      type: "info",
-      title: "Scheduled Maintenance",
-      message: "Overhead Crane #1 is scheduled for routine maintenance tomorrow at 06:00 AM.",
-      timestamp: "2024-07-29 10:00:00",
-      equipmentId: "EQ008",
-      isRead: true,
-      requiresAction: false,
-      priority: 4
-    },
-    {
-      id: "n006",
-      type: "info",
-      title: "Compliance Report",
-      message: "Monthly safety compliance report is now available for download.",
-      timestamp: "2024-07-29 09:00:00",
-      isRead: true,
-      requiresAction: false,
-      priority: 5
-    }
-  ]);
   
   const unreadNotifications = notifications.filter(n => !n.isRead);
   const criticalNotifications = notifications.filter(n => n.type === 'critical' && !n.isRead);
   const actionRequiredNotifications = notifications.filter(n => n.requiresAction && !n.isRead);
   
-  const markNotificationAsRead = (notificationId: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
-    );
+  const markNotificationAsRead = async (notificationId: string) => {
+    await fetch('/api/notifications/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: notificationId })
+    });
+    fetchData(); // Refetch all data for simplicity
   };
   
-  const dismissNotification = (notificationId: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+  const dismissNotification = async (notificationId: string) => {
+    await fetch(`/api/notifications/${notificationId}`, { method: 'DELETE' });
+    fetchData();
   };
   
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+  const markAllAsRead = async () => {
+    await fetch('/api/notifications/read-all', { method: 'POST' });
+    fetchData();
   };
   
   const getNotificationIcon = (type: Notification['type']) => {
@@ -225,244 +200,6 @@ export default function App() {
     }
   };
   
-  // Analytics data
-  const analyticsData = {
-    lockoutFrequency: {
-      labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-      datasets: [{
-        label: 'Lockouts Initiated',
-        data: [12, 19, 8, 15],
-        backgroundColor: 'rgba(59, 130, 246, 0.5)',
-        borderColor: 'rgba(59, 130, 246, 1)',
-        borderWidth: 2
-      }, {
-        label: 'Lockouts Completed',
-        data: [10, 17, 7, 13],
-        backgroundColor: 'rgba(34, 197, 94, 0.5)',
-        borderColor: 'rgba(34, 197, 94, 1)',
-        borderWidth: 2
-      }]
-    },
-    
-    equipmentBreakdown: {
-      labels: ['Conveyors', 'Pumps', 'Generators', 'Compressors', 'Presses', 'Others'],
-      datasets: [{
-        data: [25, 18, 12, 15, 20, 10],
-        backgroundColor: [
-          'rgba(59, 130, 246, 0.8)',
-          'rgba(16, 185, 129, 0.8)',
-          'rgba(245, 158, 11, 0.8)',
-          'rgba(107, 114, 128, 0.8)',
-          'rgba(139, 92, 246, 0.8)',
-          'rgba(239, 68, 68, 0.8)'
-        ],
-        borderWidth: 0
-      }]
-    },
-    
-    averageDuration: {
-      labels: ['Conveyor', 'Pump', 'Generator', 'Compressor', 'Press', 'Crane', 'Mixer', 'Oven'],
-      datasets: [{
-        label: 'Average Duration (hours)',
-        data: [2.5, 3.2, 4.8, 2.1, 3.7, 1.8, 2.9, 5.2],
-        backgroundColor: 'rgba(168, 85, 247, 0.5)',
-        borderColor: 'rgba(168, 85, 247, 1)',
-        borderWidth: 2
-      }]
-    },
-    
-    complianceMetrics: {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-      datasets: [{
-        label: 'Compliance Rate (%)',
-        data: [95, 97, 94, 98, 96, 99],
-        fill: true,
-        backgroundColor: 'rgba(34, 197, 94, 0.1)',
-        borderColor: 'rgba(34, 197, 94, 1)',
-        borderWidth: 2,
-        tension: 0.4
-      }]
-    },
-    
-    alertTrends: {
-      labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-      datasets: [{
-        label: 'Critical Alerts',
-        data: [3, 1, 5, 2],
-        backgroundColor: 'rgba(239, 68, 68, 0.5)',
-        borderColor: 'rgba(239, 68, 68, 1)',
-        borderWidth: 2
-      }, {
-        label: 'Warning Alerts',
-        data: [8, 6, 12, 7],
-        backgroundColor: 'rgba(245, 158, 11, 0.5)',
-        borderColor: 'rgba(245, 158, 11, 1)',
-        borderWidth: 2
-      }, {
-        label: 'Info Alerts',
-        data: [15, 18, 14, 20],
-        backgroundColor: 'rgba(59, 130, 246, 0.5)',
-        borderColor: 'rgba(59, 130, 246, 1)',
-        borderWidth: 2
-      }]
-    },
-    
-    responseTime: {
-      labels: ['Critical', 'Warning', 'Info'],
-      datasets: [{
-        label: 'Average Response Time (minutes)',
-        data: [8, 25, 60],
-        backgroundColor: [
-          'rgba(239, 68, 68, 0.8)',
-          'rgba(245, 158, 11, 0.8)',
-          'rgba(59, 130, 246, 0.8)'
-        ],
-        borderWidth: 0
-      }]
-    }
-  };
-  
-  const lockoutProcedures = {
-    conveyor: {
-      steps: [
-        "Notify all personnel in the area of impending lockout",
-        "Stop conveyor using emergency stop button",
-        "Switch main control to OFF position", 
-        "Lock out electrical disconnect switch",
-        "Apply personal lockout device and tag",
-        "Test conveyor controls to verify isolation",
-        "Block conveyor belt to prevent movement"
-      ],
-      hazards: ["Electrical shock", "Crushing/pinching", "Entanglement"],
-      requiredPPE: ["Safety glasses", "Steel-toed boots", "Electrical gloves"]
-    },
-    press: {
-      steps: [
-        "Complete current press cycle safely",
-        "Press emergency stop button",
-        "Turn main power switch to OFF",
-        "Lock out electrical panel disconnect",
-        "Release all stored energy (compressed air/hydraulics)",
-        "Apply personal lockout device and tag", 
-        "Test press controls to verify isolation",
-        "Install die blocks or safety props"
-      ],
-      hazards: ["Crushing", "Stored energy", "Electrical shock"],
-      requiredPPE: ["Safety glasses", "Steel-toed boots", "Hard hat"]
-    },
-    robotic_arm: {
-      steps: [
-        "Ensure robot completes current program cycle",
-        "Press emergency stop on teach pendant",
-        "Switch robot controller to OFF",
-        "Lock out main electrical disconnect",
-        "Lock out pneumatic/hydraulic supply",
-        "Apply personal lockout device and tag",
-        "Manually move arm to verify power isolation",
-        "Install mechanical restraints if required"
-      ],
-      hazards: ["Unexpected movement", "Electrical shock", "Pneumatic pressure"],
-      requiredPPE: ["Safety glasses", "Steel-toed boots", "Cut-resistant gloves"]
-    },
-    hydraulic_press: {
-      steps: [
-        "Allow press to complete current cycle",
-        "Press emergency stop button",
-        "Reduce hydraulic pressure to zero",
-        "Lock out electrical supply",
-        "Lock out hydraulic pump",
-        "Apply personal lockout device and tag",
-        "Release any residual hydraulic pressure",
-        "Install mechanical blocking devices"
-      ],
-      hazards: ["High pressure", "Crushing", "Hydraulic fluid injection"],
-      requiredPPE: ["Safety glasses", "Steel-toed boots", "Hydraulic gloves"]
-    },
-    generator: {
-      steps: [
-        "Notify electrical maintenance of planned shutdown",
-        "Reduce load gradually to zero",
-        "Switch generator breaker to OFF",
-        "Turn fuel supply valve to OFF position",
-        "Lock out main electrical disconnect",
-        "Lock out fuel supply line",
-        "Apply personal lockout device and tag",
-        "Test generator controls to verify isolation"
-      ],
-      hazards: ["Electrical shock", "Rotating machinery", "Fuel vapors"],
-      requiredPPE: ["Safety glasses", "Steel-toed boots", "Electrical gloves", "Hard hat"]
-    },
-    pump: {
-      steps: [
-        "Close discharge valve slowly",
-        "Stop pump using control switch",
-        "Close suction valve",
-        "Lock out electrical disconnect",
-        "Drain pump casing if required",
-        "Apply personal lockout device and tag",
-        "Verify pump is isolated and de-energized",
-        "Install blank flanges if needed"
-      ],
-      hazards: ["Pressure release", "Chemical exposure", "Electrical shock"],
-      requiredPPE: ["Safety glasses", "Chemical gloves", "Steel-toed boots"]
-    },
-    compressor: {
-      steps: [
-        "Reduce system pressure gradually",
-        "Switch compressor to OFF position",
-        "Close air intake valve",
-        "Lock out electrical disconnect",
-        "Bleed all pressure from receiver tank",
-        "Apply personal lockout device and tag",
-        "Open drain valves to remove condensate",
-        "Verify system is fully depressurized"
-      ],
-      hazards: ["High pressure", "Stored energy", "Electrical shock"],
-      requiredPPE: ["Safety glasses", "Steel-toed boots", "Hearing protection"]
-    },
-    crane: {
-      steps: [
-        "Lower any suspended loads safely",
-        "Park crane in designated safe position",
-        "Turn crane master switch to OFF",
-        "Lock out electrical disconnect",
-        "Set mechanical rail clamps/brakes",
-        "Apply personal lockout device and tag",
-        "Test all crane controls to verify isolation",
-        "Post warning signs at crane access points"
-      ],
-      hazards: ["Falling objects", "Electrical shock", "Crushing"],
-      requiredPPE: ["Hard hat", "Safety glasses", "Steel-toed boots"]
-    },
-    mixer: {
-      steps: [
-        "Allow current mixing cycle to complete",
-        "Stop mixer motor using control switch",
-        "Lock out electrical disconnect",
-        "Close all inlet/outlet valves",
-        "Drain mixer contents if safe to do so",
-        "Apply personal lockout device and tag",
-        "Install agitator lock or blocking device",
-        "Verify all energy sources are isolated"
-      ],
-      hazards: ["Rotating equipment", "Chemical exposure", "Entanglement"],
-      requiredPPE: ["Safety glasses", "Chemical gloves", "Steel-toed boots"]
-    },
-    oven: {
-      steps: [
-        "Allow oven to complete current cycle",
-        "Turn oven temperature control to OFF",
-        "Switch main power disconnect to OFF",
-        "Close gas/fuel supply valve",
-        "Lock out electrical and gas supplies",
-        "Apply personal lockout device and tag",
-        "Allow adequate cooling time before entry",
-        "Test atmosphere if confined space entry required"
-      ],
-      hazards: ["High temperature", "Burns", "Gas/fume exposure"],
-      requiredPPE: ["Heat-resistant gloves", "Safety glasses", "Steel-toed boots"]
-    }
-  };
   
   const getEquipmentIcon = (type: Equipment['type']) => {
     switch (type) {
@@ -524,112 +261,26 @@ export default function App() {
     return lockoutProcedures[equipmentType]?.requiredPPE || [];
   };
   
-  const completeLockout = () => {
-    // In a real app, this would update the equipment status
+  const completeLockout = async () => {
+    if (!selectedEquipment) return;
+    await fetch(`/api/equipment/${selectedEquipment.id}/lockout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: lockoutReason, user: currentUser.name })
+    });
     setLockoutDialogOpen(false);
     setProcedureStep(0);
     setSignatureRequired(false);
     setLockoutReason("");
     setSelectedEquipment(null);
+    fetchData();
   };
 
-  const [equipment] = useState<Equipment[]>([
-    {
-      id: "EQ001",
-      name: "Conveyor Belt #1",
-      location: "Production Line A",
-      type: "conveyor",
-      status: "operational",
-      voltage: "480V",
-      capacity: "2000 lbs/hr"
-    },
-    {
-      id: "EQ002", 
-      name: "Press Machine #3",
-      location: "Manufacturing Floor B",
-      type: "press",
-      status: "locked_out",
-      lastLockout: "2024-07-29 09:30",
-      assignedTo: "Mike Johnson",
-      lockoutReason: "Monthly maintenance",
-      pressure: "150 PSI"
-    },
-    {
-      id: "EQ003",
-      name: "Robotic Arm #2",
-      location: "Assembly Line C",
-      type: "robotic_arm",
-      status: "maintenance",
-      voltage: "240V"
-    },
-    {
-      id: "EQ004",
-      name: "Hydraulic Press #1",
-      location: "Manufacturing Floor A",
-      type: "hydraulic_press",
-      status: "operational",
-      pressure: "3000 PSI",
-      voltage: "480V"
-    },
-    {
-      id: "EQ005",
-      name: "Emergency Generator #1",
-      location: "Power House",
-      type: "generator",
-      status: "operational",
-      voltage: "480V/277V",
-      capacity: "500 kW"
-    },
-    {
-      id: "EQ006",
-      name: "Centrifugal Pump #4",
-      location: "Chemical Processing Unit",
-      type: "pump",
-      status: "operational",
-      pressure: "250 PSI",
-      voltage: "480V",
-      capacity: "500 GPM"
-    },
-    {
-      id: "EQ007",
-      name: "Air Compressor #2",
-      location: "Utility Room",
-      type: "compressor",
-      status: "locked_out",
-      lastLockout: "2024-07-29 07:15",
-      assignedTo: "David Chen",
-      lockoutReason: "Filter replacement",
-      pressure: "125 PSI",
-      voltage: "480V"
-    },
-    {
-      id: "EQ008",
-      name: "Overhead Crane #1",
-      location: "Heavy Assembly Bay",
-      type: "crane",
-      status: "operational",
-      voltage: "480V",
-      capacity: "20 Ton"
-    },
-    {
-      id: "EQ009",
-      name: "Industrial Mixer #3",
-      location: "Chemical Processing",
-      type: "mixer",
-      status: "maintenance",
-      voltage: "480V",
-      capacity: "1000 Gallon"
-    },
-    {
-      id: "EQ010",
-      name: "Heat Treatment Oven",
-      location: "Metal Processing",
-      type: "oven",
-      status: "operational",
-      voltage: "480V",
-      capacity: "2000°F Max"
-    }
-  ]);
+  const unlockEquipment = async (equipmentId: string) => {
+    await fetch(`/api/equipment/${equipmentId}/unlock`, { method: 'POST' });
+    fetchData();
+  };
+
   
   const kpiData = {
     totalLockouts: 154,
@@ -1267,7 +918,7 @@ export default function App() {
                             </DialogContent>
                           </Dialog>
                         ) : eq.status === 'locked_out' ? (
-                          <Button variant="default" size="sm" className="flex items-center gap-2">
+                          <Button variant="default" size="sm" className="flex items-center gap-2" onClick={() => unlockEquipment(eq.id)}>
                             <Unlock className="h-4 w-4" />
                             Unlock
                           </Button>
